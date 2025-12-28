@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Model Predictor</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        function ImagePredictor() {
+            const [prediction, setPrediction] = useState(null);
+            const [imageURL, setImageURL] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            const fileInputRef = useRef(null);
+
+            const handleImageUpload = async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                setLoading(true);
+                setPrediction(null);
+                setError(null);
+
+                const url = URL.createObjectURL(file);
+                setImageURL(url);
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('http://localhost:5000/predict', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Prediction failed');
+                    }
+
+                    const result = await response.json();
+                    setPrediction(result);
+                } catch (err) {
+                    console.error('Error:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+                    <div className="max-w-2xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-xl p-8">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-6">
+                                ML Model Predictor
+                            </h1>
+
+                            <div className="mb-6">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={loading}
+                                    className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
+                                >
+                                    {loading ? 'Processing...' : 'Upload Image for Prediction'}
+                                </button>
+                            </div>
+
+                            {error && (
+                                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                    <p className="text-red-800">
+                                        <span className="font-semibold">Error:</span> {error}
+                                    </p>
+                                    <p className="text-sm text-red-600 mt-2">
+                                        Make sure your backend server is running at http://localhost:5000
+                                    </p>
+                                </div>
+                            )}
+
+                            {imageURL && (
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Uploaded Image:</h3>
+                                    <img
+                                        src={imageURL}
+                                        alt="Uploaded"
+                                        className="w-full h-64 object-contain bg-gray-100 rounded-lg border-2 border-gray-200"
+                                    />
+                                </div>
+                            )}
+
+                            {prediction && (
+                                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg border border-purple-200">
+                                    <h3 className="text-xl font-bold text-gray-800 mb-4">Prediction Results</h3>
+                                    <div className="space-y-3">
+                                        {prediction.class !== undefined && (
+                                            <p className="text-gray-700">
+                                                <span className="font-semibold">Predicted Class:</span> {prediction.class}
+                                            </p>
+                                        )}
+                                        
+                                        {prediction.confidence !== undefined && (
+                                            <>
+                                                <p className="text-gray-700">
+                                                    <span className="font-semibold">Confidence:</span>{' '}
+                                                    {(prediction.confidence * 100).toFixed(2)}%
+                                                </p>
+                                                
+                                                <div className="w-full bg-gray-200 rounded-full h-4">
+                                                    <div
+                                                        className="bg-indigo-600 h-4 rounded-full transition-all duration-500"
+                                                        style={{ width: `${prediction.confidence * 100}%` }}
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {prediction.predictions && (
+                                            <details className="mt-4">
+                                                <summary className="cursor-pointer font-semibold text-gray-700 hover:text-indigo-600">
+                                                    View Raw Predictions
+                                                </summary>
+                                                <pre className="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto">
+                                                    {JSON.stringify(prediction, null, 2)}
+                                                </pre>
+                                            </details>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ImagePredictor />);
+    </script>
+</body>
+</html>
